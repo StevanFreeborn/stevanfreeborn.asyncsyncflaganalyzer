@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <IsPackable>true</IsPackable>
     <PackageId>StevanFreeborn.AsyncSyncFlagAnalyzer</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Authors>Stevan Freeborn</Authors>
     <Description>Roslyn analyzer to enforce passing the sync flag in optionally asynchronous execution paths.</Description>
     <PackageTags>analyzer,async,sync,flag</PackageTags>
