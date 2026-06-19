@@ -6,31 +6,106 @@
 
 A Roslyn analyzer and code fix that enforces the **Flag Argument Hack** pattern — forwarding a `sync` boolean parameter through optionally-asynchronous call chains instead of hardcoding `false` or omitting the argument.
 
-## The Problem
+## The Flag Argument Hack
 
-Consider a service interface with an optional async path:
+You are working in a legacy codebase that has existing synchronous APIs and you need to start introducing asynchronous APIs. You want to avoid code duplication and keep the logic in one place, but you also need to maintain synchronous wrappers for backward compatibility. A pattern that can be introduced to solve this problem is the **Flag Argument Hack**. It's an effective way to implement both sync and async versions of a method without duplicating code. It is described in detail in [this article](https://learn.microsoft.com/en-us/archive/msdn-magazine/2015/july/async-programming-brownfield-async-development#the-flag-argument-hack) by Stephen Cleary who credits the idea to Stephen Toub.
+
+The core idea: a private `CoreAsync` method takes a `bool sync` flag. When `sync` is `true`, the method runs synchronously and returns an already-completed task. When `sync` is `false`, it runs asynchronously. Two public wrappers — one synchronous, one asynchronous — call `CoreAsync` with `true` or `false`:
 
 ```csharp
-interface IDataService
+public interface IDataService
 {
-  Task<string> GetDataAsync(bool sync = false);
+  string Get(int id);
+  Task<string> GetAsync(int id);
+}
+
+public sealed class WebDataService : IDataService
+{
+  private async Task<string> GetCoreAsync(int id, bool sync)
+  {
+    using var client = new WebClient();
+    
+    return sync
+      ? client.DownloadString("https://example.com/api/values/" + id)
+      : await client.DownloadStringTaskAsync("https://example.com/api/values/" + id);
+  }
+
+  public string Get(int id) => GetCoreAsync(id, sync: true).GetAwaiter().GetResult();
+
+  public Task<string> GetAsync(int id) => GetCoreAsync(id, sync: false);
 }
 ```
 
-Callers in the same async infrastructure should forward their own `sync` flag:
+Because the task is already completed when `sync` is `true`, calling `.GetAwaiter().GetResult()` on it cannot deadlock — it simply retrieves the already-computed value.
+
+Business logic follows the same pattern:
 
 ```csharp
-// ✅ Good: signal is propagated
-Task<string> Good_ForwardSync(bool sync) => _dataService.GetDataAsync(sync);
+public sealed class BusinessLogic
+{
+  private readonly IDataService _dataService;
 
-// ❌ Bad: sync signal is lost
-Task<string> Bad_HardcodedValue(bool sync) => _dataService.GetDataAsync(false);
+  public BusinessLogic(IDataService dataService) => _dataService = dataService;
 
-// ❌ Bad: relies on the default (false), sync signal is lost
-Task<string> Bad_OmittedFlag(bool sync) => _dataService.GetDataAsync();
+  private async Task<string> GetFrobCoreAsync(bool sync)
+  {
+    var result = sync
+      ? _dataService.Get(17)
+      : await _dataService.GetAsync(17);
+
+    if (result != string.Empty)
+      return result;
+
+    return sync
+      ? _dataService.Get(13)
+      : await _dataService.GetAsync(13);
+  }
+
+  public string GetFrob() => GetFrobCoreAsync(sync: true).GetAwaiter().GetResult();
+
+  public Task<string> GetFrobAsync() => GetFrobCoreAsync(sync: false);
+}
 ```
 
-This analyzer flags every case where the sync parameter is dropped, and provides a code fix to forward it automatically.
+The logic stays essentially the same — it just calls different APIs based on the flag. This works well when there's a one-to-one correspondence between synchronous and asynchronous APIs, which is usually the case.
+
+## The Forwarding Problem
+
+When the `CoreAsync` method is exposed from the service layer, business logic can call it directly via `await`. Every call in the chain must forward its own `sync` flag to the next:
+
+```csharp
+public interface IDataService
+{
+  Task<string> GetCoreAsync(int id, bool sync);
+}
+
+public sealed class BusinessLogic
+{
+  private readonly IDataService _dataService;
+
+  public BusinessLogic(IDataService dataService) => _dataService = dataService;
+
+  private async Task<string> GetFrobCoreAsync(bool sync)
+  {
+    return await _dataService.GetCoreAsync(17, sync);
+  }
+
+  public string GetFrob() => GetFrobCoreAsync(sync: true).GetAwaiter().GetResult();
+
+  public Task<string> GetFrobAsync() => GetFrobCoreAsync(sync: false);
+}
+```
+
+The bug this analyzer catches is simple but subtle: forgetting to forward the flag.
+
+```csharp
+// ❌ Bad: hardcodes false, sync signal is lost
+Task<string> Bad_HardcodedValue(bool sync) => _dataService.GetCoreAsync(17, false);
+```
+
+When a developer accidentally drops the `sync` argument, the `GetCoreAsync` method silently defaults to asynchronous behavior — even when the caller asked for synchronous execution. This can cause deadlocks in synchronous wrappers or simply produce incorrect behavior depending on the implementation.
+
+The analyzer flags every invocation where the sync parameter is dropped and provides a code fix to forward it automatically.
 
 ## How It Works
 
