@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StevanFreeborn.AsyncSyncFlagAnalyzer.Common\StevanFreeborn.AsyncSyncFlagAnalyzer.Common.csproj" />
+    <ProjectReference Include="..\StevanFreeborn.AsyncSyncFlagAnalyzer.Common\StevanFreeborn.AsyncSyncFlagAnalyzer.Common.csproj" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
