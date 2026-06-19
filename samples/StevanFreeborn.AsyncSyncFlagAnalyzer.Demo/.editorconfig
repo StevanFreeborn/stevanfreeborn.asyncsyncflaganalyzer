@@ -1,0 +1,10 @@
+root = true
+
+[*.cs]
+dotnet_diagnostic.SYNC001.additional_sync_names = runSynchronously, isSync
+
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1707.severity = none
+
+indent_size = 2
+tab_width = 2

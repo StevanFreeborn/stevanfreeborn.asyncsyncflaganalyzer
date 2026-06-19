@@ -1,0 +1,56 @@
+name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  release:
+    name: Version, Build, and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 11.0.x
+      - name: Determine version
+        id: version
+        run: ./scripts/determine-version.sh main
+      - name: Update version in csproj
+        if: steps.version.outputs.VERSION
+        run: ./scripts/update-version.sh "${{ steps.version.outputs.VERSION }}"
+      - name: Create commit
+        if: steps.version.outputs.VERSION
+        run: |
+          git config user.name "gitea-actions[bot]"
+          git config user.email "gitea-actions[bot]@users.noreply.gitea.io"
+          git add -A
+          git commit -m "Bump version to ${{ steps.version.outputs.VERSION }}" || echo "No changes to commit"
+      - name: Create tag
+        if: steps.version.outputs.VERSION
+        run: |
+          git tag "v${{ steps.version.outputs.VERSION }}"
+      - name: Push changes and tags
+        if: steps.version.outputs.VERSION
+        run: |
+          git push origin main
+          git push origin v${{ steps.version.outputs.VERSION }}
+      - name: Restore dependencies
+        if: steps.version.outputs.VERSION
+        run: dotnet restore
+      - name: Build
+        if: steps.version.outputs.VERSION
+        run: dotnet build --configuration Release --no-restore
+      - name: Run tests
+        if: steps.version.outputs.VERSION
+        run: dotnet test --configuration Release --no-build --verbosity normal
+      - name: Pack
+        if: steps.version.outputs.VERSION
+        run: dotnet pack --configuration Release --no-build --output ./artifacts
+      - name: Push to NuGet
+        if: steps.version.outputs.VERSION
+        run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}

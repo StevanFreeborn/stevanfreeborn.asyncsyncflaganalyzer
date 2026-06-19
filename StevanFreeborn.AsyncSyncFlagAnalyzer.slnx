@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StevanFreeborn.AsyncSyncFlagAnalyzer/StevanFreeborn.AsyncSyncFlagAnalyzer.csproj" />
+    <Project Path="src/StevanFreeborn.AsyncSyncFlagAnalyzer.CodeFixes/StevanFreeborn.AsyncSyncFlagAnalyzer.CodeFixes.csproj" />
+    <Project Path="src/StevanFreeborn.AsyncSyncFlagAnalyzer.Common/StevanFreeborn.AsyncSyncFlagAnalyzer.Common.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/StevanFreeborn.AsyncSyncFlagAnalyzer.Tests/StevanFreeborn.AsyncSyncFlagAnalyzer.Tests.csproj" />
+  </Folder>
+</Solution>
