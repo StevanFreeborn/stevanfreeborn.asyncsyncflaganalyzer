@@ -135,7 +135,7 @@ Add the NuGet package to projects that need the analyzer:
 ```xml
 <PackageReference 
   Include="StevanFreeborn.AsyncSyncFlagAnalyzer"
-  Version="0.0.0"
+  Version="x.x.x"
   ReferenceOutputAssembly="false"
   OutputItemType="Analyzer" 
 />
